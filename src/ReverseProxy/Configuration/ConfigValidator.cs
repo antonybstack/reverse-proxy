@@ -112,6 +112,7 @@ internal sealed class ConfigValidator : IConfigValidator
         }
 
         errors.AddRange(_transformBuilder.ValidateCluster(cluster));
+        ValidateDestinations(errors, cluster);
         ValidateLoadBalancing(errors, cluster);
         ValidateSessionAffinity(errors, cluster);
         ValidateProxyHttpClient(errors, cluster);
@@ -366,6 +367,21 @@ internal sealed class ConfigValidator : IConfigValidator
         }
     }
 
+    private void ValidateDestinations(IList<Exception> errors, ClusterConfig cluster)
+    {
+        if (cluster.Destinations is null)
+        {
+            return;
+        }
+        foreach (var (name, destination) in cluster.Destinations)
+        {
+            if (string.IsNullOrEmpty(destination.Address))
+            {
+                errors.Add(new ArgumentException($"No address found for destination '{name}' on cluster '{cluster.ClusterId}'."));
+            }
+        }
+    }
+
     private void ValidateLoadBalancing(IList<Exception> errors, ClusterConfig cluster)
     {
         var loadBalancingPolicy = cluster.LoadBalancingPolicy;
@@ -482,7 +498,7 @@ internal sealed class ConfigValidator : IConfigValidator
         if (string.IsNullOrEmpty(availableDestinationsPolicy))
         {
             // The default.
-            availableDestinationsPolicy = HealthCheckConstants.AvailableDestinations.HealthyAndUnknown;
+            availableDestinationsPolicy = HealthCheckConstants.AvailableDestinations.HealthyOrPanic;
         }
 
         if (!_availableDestinationsPolicies.ContainsKey(availableDestinationsPolicy))
